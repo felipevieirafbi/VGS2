@@ -70,8 +70,12 @@ export const Chatbot: React.FC = () => {
         parts: [{ text: m.content }]
       }));
 
+      if (!process.env.GEMINI_API_KEY || process.env.GEMINI_API_KEY === 'MY_GEMINI_API_KEY') {
+        throw new Error('A chave da API do Gemini não está configurada ou é inválida. Por favor, configure a variável GEMINI_API_KEY no painel de Secrets.');
+      }
+
       const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
+        model: 'gemini-3.1-pro-preview',
         contents: [
           { role: 'user', parts: [{ text: systemInstruction }] },
           { role: 'model', parts: [{ text: 'Entendido.' }] },
@@ -81,9 +85,15 @@ export const Chatbot: React.FC = () => {
       });
 
       setMessages(prev => [...prev, { role: 'model', content: response.text || 'Desculpe, não consegui processar sua mensagem.' }]);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Chatbot error:', error);
-      toast.error('Erro ao enviar mensagem.');
+      let errorMessage = 'Erro desconhecido.';
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      } else if (typeof error === 'string') {
+        errorMessage = error;
+      }
+      toast.error(`Erro ao enviar mensagem: ${errorMessage}`);
     } finally {
       setIsLoading(false);
     }

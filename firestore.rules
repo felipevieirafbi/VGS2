@@ -122,7 +122,7 @@ service cloud.firestore {
              (!('name' in data) || data.name == null || data.name == '' || (data.name is string && data.name.size() < 100)) &&
              data.source in ['Site Orgânico', 'Chatbot IA', 'Manual/Outbound', 'Indicação'] &&
              data.status in ['Novos Leads', 'Análise OSINT', 'Reunião Agendada', 'Proposta Enviada', 'Negociação', 'Fechado', 'Lixeira'] &&
-             (!('osintData' in data) || data.osintData == null || (data.osintData is string && data.osintData.size() < 10000)) &&
+             (!('osintData' in data) || data.osintData == null || (data.osintData is string && data.osintData.size() < 50000)) &&
              (!('lastModifiedBy' in data) || data.lastModifiedBy == null || (data.lastModifiedBy is string && data.lastModifiedBy.size() < 100)) &&
              isValidDateString(data.createdAt) &&
              isValidDateString(data.updatedAt);
@@ -149,7 +149,7 @@ service cloud.firestore {
     function isValidAuditLog(data) {
       return hasOnlyAllowedFields(['userId', 'action', 'entityId', 'timestamp']) &&
              data.userId is string && data.userId.size() > 0 && data.userId.size() < 100 &&
-             data.action is string && data.action.size() > 0 && data.action.size() < 200 &&
+             data.action is string && data.action.size() > 0 && data.action.size() < 500 &&
              data.entityId is string && data.entityId.size() > 0 && data.entityId.size() < 100 &&
              isValidDateString(data.timestamp);
     }

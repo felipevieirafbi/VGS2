@@ -8,6 +8,7 @@ import Markdown from 'react-markdown';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { handleFirestoreError, OperationType } from '../lib/utils';
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
@@ -47,7 +48,7 @@ export const LeadModal: React.FC<LeadModalProps> = ({ lead, onClose }) => {
 
   const logAction = async (action: string) => {
     await addDoc(collection(db, 'audit_logs'), {
-      userId: profile?.uid,
+      userId: profile?.uid || 'unknown',
       action: `${action} para o lead ${lead.companyName}`,
       entityId: lead.id,
       timestamp: new Date().toISOString()
@@ -77,8 +78,12 @@ Liste as barreiras que provavelmente impedem esta empresa de licitar: falta de e
 ## 6. Script de Abordagem Personalizado
 Escreva um texto persuasivo para o primeiro contato (WhatsApp ou ligação), posicionando a VGS como parceira que opera TODO o processo licitatório. Foque nos benefícios: receita previsível, contratos longos, zero burocracia. Mencione que a VGS cuida do SICAF, análise de editais, propostas, robô de lances, defesas administrativas e acompanhamento até o pagamento.`;
 
+      if (!process.env.GEMINI_API_KEY || process.env.GEMINI_API_KEY === 'MY_GEMINI_API_KEY') {
+        throw new Error('A chave da API do Gemini não está configurada ou é inválida. Por favor, configure a variável GEMINI_API_KEY no painel de Secrets (ícone de cadeado).');
+      }
+
       const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
+        model: 'gemini-3.1-pro-preview',
         contents: [{ role: 'user', parts: [{ text: prompt }] }],
       });
 
@@ -91,9 +96,22 @@ Escreva um texto persuasivo para o primeiro contato (WhatsApp ou ligação), pos
 
       await logAction('Gerou Relatório OSINT');
       toast.success('Relatório OSINT gerado com sucesso!');
-    } catch (error) {
+    } catch (error: any) {
       console.error('OSINT error:', error);
-      toast.error('Erro ao gerar relatório OSINT.');
+      
+      let errorMessage = 'Erro desconhecido.';
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      } else if (typeof error === 'string') {
+        errorMessage = error;
+      }
+      
+      // Formata a mensagem para ser mais amigável se for erro do Firestore
+      if (errorMessage.includes('Missing or insufficient permissions')) {
+        errorMessage = 'Permissão negada no banco de dados. Verifique as regras do Firestore (tamanho do texto ou campos obrigatórios).';
+      }
+      
+      toast.error(`Erro ao gerar relatório: ${errorMessage}`, { duration: 8000 });
     } finally {
       setIsGeneratingOsint(false);
     }
