@@ -1,0 +1,96 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile and role information",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "role": { "type": "string", "enum": ["admin", "user"] },
+        "avatar_url": { "type": "string" }
+      },
+      "required": ["uid", "name", "email", "role"]
+    },
+    "Lead": {
+      "title": "Lead",
+      "description": "A potential client for VGS Licitações",
+      "type": "object",
+      "properties": {
+        "companyName": { "type": "string" },
+        "cnpj": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "phone": { "type": "string" },
+        "name": { "type": "string" },
+        "source": { "type": "string", "enum": ["Site Orgânico", "Chatbot IA", "Manual/Outbound", "Indicação"] },
+        "status": { "type": "string", "enum": ["Novos Leads", "Análise OSINT", "Reunião Agendada", "Proposta Enviada", "Negociação", "Fechado", "Lixeira"] },
+        "osintData": { "type": "string" },
+        "lastModifiedBy": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["companyName", "cnpj", "source", "status", "createdAt", "updatedAt"]
+    },
+    "Interaction": {
+      "title": "Interaction",
+      "description": "A note or interaction with a lead",
+      "type": "object",
+      "properties": {
+        "leadId": { "type": "string" },
+        "userId": { "type": "string" },
+        "notes": { "type": "string" },
+        "interactionType": { "type": "string" },
+        "date": { "type": "string", "format": "date-time" }
+      },
+      "required": ["leadId", "userId", "notes", "date"]
+    },
+    "Task": {
+      "title": "Task",
+      "description": "A task associated with a lead",
+      "type": "object",
+      "properties": {
+        "leadId": { "type": "string" },
+        "title": { "type": "string" },
+        "actionDate": { "type": "string", "format": "date-time" },
+        "description_ai_generated": { "type": "string" },
+        "completed": { "type": "boolean" }
+      },
+      "required": ["leadId", "title", "actionDate", "completed"]
+    },
+    "AuditLog": {
+      "title": "AuditLog",
+      "description": "Audit trail for system actions",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "action": { "type": "string" },
+        "entityId": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "action", "entityId", "timestamp"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/User" },
+      "description": "Stores user profiles and roles"
+    },
+    "/leads/{leadId}": {
+      "schema": { "$ref": "#/entities/Lead" },
+      "description": "Stores leads"
+    },
+    "/interactions/{interactionId}": {
+      "schema": { "$ref": "#/entities/Interaction" },
+      "description": "Stores interactions with leads"
+    },
+    "/tasks/{taskId}": {
+      "schema": { "$ref": "#/entities/Task" },
+      "description": "Stores tasks related to leads"
+    },
+    "/audit_logs/{logId}": {
+      "schema": { "$ref": "#/entities/AuditLog" },
+      "description": "Stores audit logs for all actions"
+    }
+  }
+}

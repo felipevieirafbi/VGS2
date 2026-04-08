@@ -1,0 +1,202 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users
+    // Document ID: user UID
+    // Fields:
+    //   - uid: string (required)
+    //   - name: string (required, < 100 chars)
+    //   - email: string (required, valid email)
+    //   - role: string (required, 'admin' or 'user')
+    //   - avatar_url: string (optional, valid url)
+    //
+    // Collection: leads
+    // Document ID: auto-generated
+    // Fields:
+    //   - companyName: string (required, < 200 chars)
+    //   - cnpj: string (required, < 20 chars)
+    //   - email: string (optional, valid email or empty)
+    //   - phone: string (optional, < 30 chars)
+    //   - name: string (optional, < 100 chars)
+    //   - source: string (required, enum)
+    //   - status: string (required, enum)
+    //   - osintData: string (optional, < 10000 chars)
+    //   - lastModifiedBy: string (optional)
+    //   - createdAt: string (required, ISO date string)
+    //   - updatedAt: string (required, ISO date string)
+    //
+    // Collection: interactions
+    // Document ID: auto-generated
+    // Fields:
+    //   - leadId: string (required)
+    //   - userId: string (required)
+    //   - notes: string (required, < 5000 chars)
+    //   - interactionType: string (optional, < 50 chars)
+    //   - date: string (required, ISO date string)
+    //
+    // Collection: tasks
+    // Document ID: auto-generated
+    // Fields:
+    //   - leadId: string (required)
+    //   - title: string (required, < 200 chars)
+    //   - actionDate: string (required, ISO date string)
+    //   - description_ai_generated: string (optional, < 5000 chars)
+    //   - completed: boolean (required)
+    //
+    // Collection: audit_logs
+    // Document ID: auto-generated
+    // Fields:
+    //   - userId: string (required)
+    //   - action: string (required, < 200 chars)
+    //   - entityId: string (required)
+    //   - timestamp: string (required, ISO date string)
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && (
+        (request.auth.token.email == "felipe.vieira.consultoria@gmail.com" && request.auth.token.email_verified == true) ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin')
+      );
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    function isValidEmail(email) {
+      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    function isValidUrl(url) {
+      return url is string && (url.matches("^https://.*") || url.matches("^http://.*"));
+    }
+
+    function isValidDateString(dateStr) {
+      return dateStr is string && dateStr.matches("^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}.*Z?$");
+    }
+
+    function isValidOptionalString(field, maxLen) {
+      return !('field' in request.resource.data) || request.resource.data[field] == null || (request.resource.data[field] is string && request.resource.data[field].size() <= maxLen);
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+
+    function isValidUser(data) {
+      return hasOnlyAllowedFields(['uid', 'name', 'email', 'role', 'avatar_url']) &&
+             data.uid is string && data.uid.size() > 0 && data.uid.size() < 100 &&
+             data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
+             data.email is string && isValidEmail(data.email) &&
+             data.role in ['admin', 'user'] &&
+             (!('avatar_url' in data) || data.avatar_url == null || isValidUrl(data.avatar_url));
+    }
+
+    function isValidLead(data) {
+      return hasOnlyAllowedFields(['companyName', 'cnpj', 'email', 'phone', 'name', 'source', 'status', 'osintData', 'lastModifiedBy', 'createdAt', 'updatedAt']) &&
+             data.companyName is string && data.companyName.size() > 0 && data.companyName.size() < 200 &&
+             data.cnpj is string && data.cnpj.size() > 0 && data.cnpj.size() < 20 &&
+             (!('email' in data) || data.email == null || data.email == '' || isValidEmail(data.email)) &&
+             (!('phone' in data) || data.phone == null || data.phone == '' || (data.phone is string && data.phone.size() < 30)) &&
+             (!('name' in data) || data.name == null || data.name == '' || (data.name is string && data.name.size() < 100)) &&
+             data.source in ['Site Orgânico', 'Chatbot IA', 'Manual/Outbound', 'Indicação'] &&
+             data.status in ['Novos Leads', 'Análise OSINT', 'Reunião Agendada', 'Proposta Enviada', 'Negociação', 'Fechado', 'Lixeira'] &&
+             (!('osintData' in data) || data.osintData == null || (data.osintData is string && data.osintData.size() < 10000)) &&
+             (!('lastModifiedBy' in data) || data.lastModifiedBy == null || (data.lastModifiedBy is string && data.lastModifiedBy.size() < 100)) &&
+             isValidDateString(data.createdAt) &&
+             isValidDateString(data.updatedAt);
+    }
+
+    function isValidInteraction(data) {
+      return hasOnlyAllowedFields(['leadId', 'userId', 'notes', 'interactionType', 'date']) &&
+             data.leadId is string && data.leadId.size() > 0 && data.leadId.size() < 100 &&
+             data.userId is string && data.userId.size() > 0 && data.userId.size() < 100 &&
+             data.notes is string && data.notes.size() > 0 && data.notes.size() < 5000 &&
+             (!('interactionType' in data) || data.interactionType == null || (data.interactionType is string && data.interactionType.size() < 50)) &&
+             isValidDateString(data.date);
+    }
+
+    function isValidTask(data) {
+      return hasOnlyAllowedFields(['leadId', 'title', 'actionDate', 'description_ai_generated', 'completed']) &&
+             data.leadId is string && data.leadId.size() > 0 && data.leadId.size() < 100 &&
+             data.title is string && data.title.size() > 0 && data.title.size() < 200 &&
+             isValidDateString(data.actionDate) &&
+             (!('description_ai_generated' in data) || data.description_ai_generated == null || (data.description_ai_generated is string && data.description_ai_generated.size() < 5000)) &&
+             data.completed is bool;
+    }
+
+    function isValidAuditLog(data) {
+      return hasOnlyAllowedFields(['userId', 'action', 'entityId', 'timestamp']) &&
+             data.userId is string && data.userId.size() > 0 && data.userId.size() < 100 &&
+             data.action is string && data.action.size() > 0 && data.action.size() < 200 &&
+             data.entityId is string && data.entityId.size() > 0 && data.entityId.size() < 100 &&
+             isValidDateString(data.timestamp);
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && isValidUser(request.resource.data) && (
+        (isOwner(userId) && request.resource.data.role == 'user') || isAdmin()
+      ) && request.resource.data.uid == userId;
+      allow update: if isAuthenticated() && isValidUser(request.resource.data) && (
+        (isOwner(userId) && request.resource.data.role == resource.data.role) || isAdmin()
+      ) && request.resource.data.uid == resource.data.uid;
+      allow delete: if isAdmin();
+    }
+
+    match /leads/{leadId} {
+      // Anyone can create a lead (from landing page or chatbot)
+      allow create: if isValidLead(request.resource.data);
+      // Only authenticated users can read/update leads
+      allow read: if isAuthenticated();
+      allow update: if isAuthenticated() && isValidLead(request.resource.data) && request.resource.data.createdAt == resource.data.createdAt;
+      allow delete: if isAdmin();
+    }
+
+    match /interactions/{interactionId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && isValidInteraction(request.resource.data);
+      allow update: if isAuthenticated() && isValidInteraction(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /tasks/{taskId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && isValidTask(request.resource.data);
+      allow update: if isAuthenticated() && isValidTask(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /audit_logs/{logId} {
+      allow read: if isAdmin();
+      allow create: if isAuthenticated() && isValidAuditLog(request.resource.data);
+      allow update: if false; // Audit logs should be immutable
+      allow delete: if false; // Audit logs should never be deleted
+    }
+  }
+}
