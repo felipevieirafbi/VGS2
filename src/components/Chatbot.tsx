@@ -5,8 +5,6 @@ import { collection, addDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { toast } from 'sonner';
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-
 interface Message {
   role: 'user' | 'model';
   content: string;
@@ -70,9 +68,14 @@ export const Chatbot: React.FC = () => {
         parts: [{ text: m.content }]
       }));
 
-      if (!process.env.GEMINI_API_KEY || process.env.GEMINI_API_KEY === 'MY_GEMINI_API_KEY') {
+      const apiKey = process.env.GEMINI_API_KEY;
+      console.log('Verificando API Key no Chatbot (tamanho):', apiKey ? apiKey.length : 'undefined');
+
+      if (!apiKey || apiKey === 'MY_GEMINI_API_KEY') {
         throw new Error('A chave da API do Gemini não está configurada ou é inválida. Por favor, configure a variável GEMINI_API_KEY no painel de Secrets.');
       }
+
+      const ai = new GoogleGenAI({ apiKey });
 
       const response = await ai.models.generateContent({
         model: 'gemini-3.1-pro-preview',

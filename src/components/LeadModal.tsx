@@ -10,8 +10,6 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { handleFirestoreError, OperationType } from '../lib/utils';
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-
 interface LeadModalProps {
   lead: any;
   onClose: () => void;
@@ -78,9 +76,14 @@ Liste as barreiras que provavelmente impedem esta empresa de licitar: falta de e
 ## 6. Script de Abordagem Personalizado
 Escreva um texto persuasivo para o primeiro contato (WhatsApp ou ligação), posicionando a VGS como parceira que opera TODO o processo licitatório. Foque nos benefícios: receita previsível, contratos longos, zero burocracia. Mencione que a VGS cuida do SICAF, análise de editais, propostas, robô de lances, defesas administrativas e acompanhamento até o pagamento.`;
 
-      if (!process.env.GEMINI_API_KEY || process.env.GEMINI_API_KEY === 'MY_GEMINI_API_KEY') {
+      const apiKey = process.env.GEMINI_API_KEY;
+      console.log('Verificando API Key (tamanho):', apiKey ? apiKey.length : 'undefined');
+      
+      if (!apiKey || apiKey === 'MY_GEMINI_API_KEY') {
         throw new Error('A chave da API do Gemini não está configurada ou é inválida. Por favor, configure a variável GEMINI_API_KEY no painel de Secrets (ícone de cadeado).');
       }
+
+      const ai = new GoogleGenAI({ apiKey });
 
       const response = await ai.models.generateContent({
         model: 'gemini-3.1-pro-preview',
@@ -195,15 +198,13 @@ Escreva um texto persuasivo para o primeiro contato (WhatsApp ou ligação), pos
                     <Search className="w-5 h-5 text-orange-500" />
                     Inteligência OSINT
                   </h3>
-                  {!lead.osintData && (
-                    <button
-                      onClick={generateOsint}
-                      disabled={isGeneratingOsint}
-                      className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors disabled:opacity-50 text-sm font-medium"
-                    >
-                      {isGeneratingOsint ? 'Analisando...' : 'Pesquisa Completa da Empresa'}
-                    </button>
-                  )}
+                  <button
+                    onClick={generateOsint}
+                    disabled={isGeneratingOsint}
+                    className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors disabled:opacity-50 text-sm font-medium"
+                  >
+                    {isGeneratingOsint ? 'Analisando...' : lead.osintData ? 'Atualizar Relatório OSINT' : 'Pesquisa Completa da Empresa'}
+                  </button>
                 </div>
                 
                 {lead.osintData ? (
